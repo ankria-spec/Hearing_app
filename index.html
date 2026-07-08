@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>רואים את הקולות · LiveVoice</title>
+<meta name="theme-color" content="#0D1417">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@font-face{
+  font-family:'OpenDyslexic';
+  src:url('https://fonts.cdnfonts.com/s/16878/OpenDyslexic-Regular.woff') format('woff');
+  font-weight:400; font-display:swap;
+}
+@font-face{
+  font-family:'OpenDyslexic';
+  src:url('https://fonts.cdnfonts.com/s/16878/OpenDyslexic-Bold.woff') format('woff');
+  font-weight:700; font-display:swap;
+}
+
+:root{
+  --bg:#F5F7F8;
+  --surface:#FFFFFF;
+  --surface-2:#EBEFF1;
+  --ink:#16202A;
+  --muted:#5B6B76;
+  --border:#DCE3E6;
+  --accent-me:#186A5D;
+  --accent-me-soft:#DCEFE9;
+  --accent-other:#A6501E;
+  --accent-other-soft:#F6E4D6;
+  --danger:#9C3B3B;
+  --focus:#1E6E62;
+  --radius-lg:26px;
+  --radius-md:16px;
+  --radius-sm:10px;
+  --shadow:0 8px 28px rgba(20,30,35,.08);
+  --scale:1;
+  --ui-font:'Assistant', 'Arial', sans-serif;
+  --display-font:'Rubik', 'Arial', sans-serif;
+}
+
+html[data-theme="dark"]{
+  --bg:#0D1417;
+  --surface:#151F24;
+  --surface-2:#1D2A30;
+  --ink:#EAF2F4;
+  --muted:#9FB0B8;
+  --border:#2A383F;
+  --accent-me:#49D9BC;
+  --accent-me-soft:#173630;
+  --accent-other:#F0A868;
+  --accent-other-soft:#3A2A18;
+  --danger:#E77D7D;
+  --focus:#49D9BC;
+  --shadow:0 8px 30px rgba(0,0,0,.4);
+}
+
+html[data-contrast="high"]{
+  --bg:#000000;
+  --surface:#000000;
+  --surface-2:#0A0A0A;
+  --ink:#FFFFFF;
+  --muted:#FFD400;
+  --border:#FFFFFF;
+  --accent-me:#00E5C7;
+  --accent-me-soft:#062622;
+  --accent-other:#FFB020;
+  --accent-other-soft:#2A1D00;
+  --danger:#FF5C5C;
+  --focus:#FFD400;
+  --shadow:none;
+}
+html[data-contrast="high"] .surface,
+html[data-contrast="high"] .bar,
+html[data-contrast="high"] .entry{ border:2px solid var(--border) !important; }
+
+html[data-font="dyslexic"]{
+  --ui-font:'OpenDyslexic', 'Arial', sans-serif;
+  --display-font:'OpenDyslexic', 'Arial', sans-serif;
+}
+html[data-font="arial"]{
+  --ui-font:'Arial', sans-serif;
+  --display-font:'Arial', sans-serif;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--ui-font);
+  transition:background .25s ease, color .25s ease;
+  overflow:hidden;
+}
+
+.app{
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ---------- TOP BAR ---------- */
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand-mark{
+  width:38px; height:38px; border-radius:11px;
+  background:linear-gradient(135deg, var(--accent-me), var(--accent-other));
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.brand-mark svg{ width:20px; height:20px; }
+.brand-text h1{ font:800 17px var(--display-font); margin:0; letter-spacing:.2px; }
+.brand-text p{ margin:0; font-size:11px; color:var(--muted); letter-spacing:.5px; }
+.icon-btn{
+  width:42px; height:42px; border-radius:50%;
+  border:1px solid var(--border);
+  background:var(--surface);
+  color:var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+.icon-btn svg{ width:20px; height:20px; }
+.icon-btn:focus-visible, button:focus-visible, select:focus-visible{
+  outline:3px solid var(--focus); outline-offset:2px;
+}
+
+/* ---------- MAIN / TRANSCRIPT ---------- */
+main{
+  flex:1;
+  overflow-y:auto;
+  padding:18px 16px 8px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.empty-state{
+  margin:auto;
+  text-align:center;
+  color:var(--muted);
+  max-width:320px;
+}
+.empty-state .waves{ display:flex; justify-content:center; gap:6px; margin-bottom:18px; opacity:.5;}
+.empty-state .waves span{ width:5px; height:22px; border-radius:4px; background:var(--muted); }
+.empty-state h2{ font:700 20px var(--display-font); color:var(--ink); margin:0 0 6px; }
+.empty-state p{ font-size:14px; line-height:1.6; margin:0; }
+
+.entry{
+  max-width:88%;
+  padding:14px 18px;
+  border-radius:var(--radius-md);
+  font:600 calc(26px * var(--scale)) / 1.5 var(--display-font);
+  animation:rise .3s ease;
+}
+@keyframes rise{ from{ opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+
+.entry.me{
+  align-self:flex-end;
+  background:var(--accent-me-soft);
+  color:var(--ink);
+  border-inline-end:5px solid var(--accent-me);
+}
+.entry.other{
+  align-self:flex-start;
+  background:var(--accent-other-soft);
+  color:var(--ink);
+  border-inline-start:5px solid var(--accent-other);
+}
+.entry.solo{
+  align-self:stretch;
+  max-width:100%;
+  background:var(--surface);
+  border:1px solid var(--border);
+}
+.entry .who{
+  display:block;
+  font:700 11px var(--ui-font);
+  letter-spacing:.5px;
+  margin-bottom:4px;
+  color:var(--muted);
+}
+.entry.me .who{ color:var(--accent-me); }
+.entry.other .who{ color:var(--accent-other); }
+
+.interim-line{
+  font:600 calc(26px * var(--scale)) / 1.5 var(--display-font);
+  color:var(--muted);
+  padding:0 18px;
+  min-height:1.5em;
+}
+.interim-line .word-highlight{ color:var(--ink); }
+
+/* ---------- BOTTOM CONTROL DOCK ---------- */
+.dock{
+  flex-shrink:0;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.mode-row{
+  display:flex;
+  gap:8px;
+}
+.chip{
+  flex:1;
+  border:1px solid var(--border);
+  background:var(--surface-2);
+  color:var(--muted);
+  border-radius:999px;
+  padding:9px 10px;
+  font:600 13px var(--ui-font);
+  cursor:pointer;
+}
+.chip.active{
+  background:var(--ink);
+  color:var(--surface);
+  border-color:var(--ink);
+}
+
+.speaker-row{
+  display:none;
+  gap:8px;
+}
+.speaker-row.visible{ display:flex; }
+.speaker-btn{
+  flex:1;
+  border-radius:var(--radius-sm);
+  border:2px solid var(--border);
+  background:var(--surface-2);
+  color:var(--ink);
+  padding:12px 8px;
+  font:700 15px var(--ui-font);
+  cursor:pointer;
+}
+.speaker-btn.me.active{ border-color:var(--accent-me); background:var(--accent-me-soft); color:var(--accent-me); }
+.speaker-btn.other.active{ border-color:var(--accent-other); background:var(--accent-other-soft); color:var(--accent-other); }
+
+.mic-area{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  padding:6px 0 2px;
+}
+.mic-wrap{ position:relative; width:104px; height:104px; display:flex; align-items:center; justify-content:center; }
+.mic-bars{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center; gap:4px;
+  pointer-events:none;
+}
+.mic-bars span{
+  width:5px; border-radius:4px;
+  background:var(--accent-me);
+  height:10px;
+  opacity:0;
+  transition:height .08s ease, opacity .2s ease;
+}
+.mic-btn{
+  position:relative;
+  width:88px; height:88px;
+  border-radius:50%;
+  border:none;
+  background:var(--ink);
+  color:var(--bg);
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow);
+  transition:background .2s ease, transform .15s ease;
+  z-index:1;
+}
+.mic-btn svg{ width:32px; height:32px; }
+.mic-btn.listening{
+  background:var(--accent-me);
+  color:var(--surface);
+  animation:pulse 1.4s ease-in-out infinite;
+}
+.mic-btn.listening .mic-bars{ opacity:1; }
+@keyframes pulse{
+  0%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--accent-me) 45%, transparent); }
+  70%{ box-shadow:0 0 0 22px color-mix(in srgb, var(--accent-me) 0%, transparent); }
+  100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--accent-me) 0%, transparent); }
+}
+.mic-label{ font:700 14px var(--ui-font); color:var(--ink); min-height:1.2em; }
+
+.actions-row{ display:flex; gap:8px; }
+.action-btn{
+  flex:1;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 6px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--surface-2);
+  color:var(--ink);
+  font:600 12px var(--ui-font);
+  cursor:pointer;
+}
+.action-btn svg{ width:16px; height:16px; flex-shrink:0; }
+.action-btn.danger{ color:var(--danger); }
+
+/* ---------- SETTINGS PANEL ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.4);
+  opacity:0; pointer-events:none; transition:opacity .25s ease;
+  z-index:10;
+}
+.overlay.open{ opacity:1; pointer-events:auto; }
+
+.panel{
+  position:fixed; top:0; bottom:0; inset-inline-end:0;
+  width:min(340px, 88vw);
+  background:var(--surface);
+  border-inline-start:1px solid var(--border);
+  transform:translateX(100%);
+  transition:transform .3s ease;
+  z-index:11;
+  padding:20px;
+  overflow-y:auto;
+}
+html[dir="rtl"] .panel{ transform:translateX(-100%); }
+.panel.open{ transform:translateX(0); }
+
+.panel h2{ font:800 18px var(--display-font); margin:0 0 18px; }
+.panel-section{ margin-bottom:22px; }
+.panel-section h3{ font:700 12px var(--ui-font); color:var(--muted); letter-spacing:.5px; margin:0 0 10px; }
+.seg{ display:flex; gap:8px; }
+.seg button{
+  flex:1;
+  padding:10px 6px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--surface-2);
+  color:var(--ink);
+  font:600 13px var(--ui-font);
+  cursor:pointer;
+}
+.seg button.active{ background:var(--ink); color:var(--surface); border-color:var(--ink); }
+
+.size-row{ display:flex; align-items:center; gap:10px; }
+.size-row button{
+  width:42px; height:42px; border-radius:50%;
+  border:1px solid var(--border); background:var(--surface-2);
+  font:700 18px var(--ui-font); color:var(--ink); cursor:pointer;
+}
+.size-row .size-val{ flex:1; text-align:center; font:700 14px var(--ui-font); }
+
+select.lang-select{
+  width:100%; padding:12px; border-radius:var(--radius-sm);
+  border:1px solid var(--border); background:var(--surface-2); color:var(--ink);
+  font:600 14px var(--ui-font);
+}
+.panel-close{
+  width:100%; margin-top:6px; padding:12px; border-radius:var(--radius-sm);
+  border:none; background:var(--ink); color:var(--surface);
+  font:700 14px var(--ui-font); cursor:pointer;
+}
+
+/* ---------- TOAST ---------- */
+.toast{
+  position:fixed; bottom:150px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:var(--bg);
+  padding:10px 18px; border-radius:999px;
+  font:600 13px var(--ui-font);
+  opacity:0; pointer-events:none;
+  transition:opacity .25s ease, transform .25s ease;
+  z-index:20;
+  white-space:nowrap;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001s !important; transition-duration:.001s !important; }
+}
+
+::-webkit-scrollbar{ width:6px; }
+::-webkit-scrollbar-thumb{ background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body data-theme="light">
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><path d="M3 12h2l2-6 3 12 3-9 2 5h5"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>רואים את הקולות</h1>
+        <p>LIVEVOICE</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="הגדרות נגישות">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <main id="transcriptArea">
+    <div class="empty-state" id="emptyState">
+      <div class="waves"><span></span><span style="height:34px"></span><span style="height:16px"></span><span style="height:30px"></span><span></span></div>
+      <h2>מוכנים להקשיב</h2>
+      <p>לחצו על כפתור המיקרופון למטה כדי להתחיל לתמלל את השיחה בזמן אמת, בעברית או באנגלית.</p>
+    </div>
+  </main>
+
+  <div class="interim-line" id="interimLine" aria-live="polite"></div>
+
+  <div class="dock">
+    <div class="mode-row">
+      <button class="chip active" id="soloModeBtn">שיחה יחידה</button>
+      <button class="chip" id="dialogModeBtn">מצב דו־שיח</button>
+    </div>
+
+    <div class="speaker-row" id="speakerRow">
+      <button class="speaker-btn me active" id="meBtn">אני מדבר/ת</button>
+      <button class="speaker-btn other" id="otherBtn">הצד השני מדבר</button>
+    </div>
+
+    <div class="mic-area">
+      <div class="mic-wrap">
+        <div class="mic-bars" id="micBars">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <button class="mic-btn" id="micBtn" aria-label="התחל להקשיב">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <div class="mic-label" id="micLabel">התחל להקשיב</div>
+    </div>
+
+    <div class="actions-row">
+      <button class="action-btn" id="clearBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        נקה מסך
+      </button>
+      <button class="action-btn" id="copyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        העתק טקסט
+      </button>
+      <button class="action-btn" id="shareBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>
+        שיתוף
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="panel" id="settingsPanel" role="dialog" aria-label="הגדרות נגישות">
+  <h2>הגדרות נגישות</h2>
+
+  <div class="panel-section">
+    <h3>שפת תמלול</h3>
+    <select class="lang-select" id="langSelect">
+      <option value="he-IL">עברית</option>
+      <option value="en-US">English</option>
+    </select>
+  </div>
+
+  <div class="panel-section">
+    <h3>ערכת נושא</h3>
+    <div class="seg">
+      <button class="active" data-theme-btn="light">בהיר</button>
+      <button data-theme-btn="dark">כהה</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>ניגודיות</h3>
+    <div class="seg">
+      <button class="active" data-contrast-btn="normal">רגיל</button>
+      <button data-contrast-btn="high">גבוהה</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>גופן</h3>
+    <div class="seg">
+      <button class="active" data-font-btn="assistant">רגיל</button>
+      <button data-font-btn="arial">Arial</button>
+      <button data-font-btn="dyslexic">OpenDyslexic</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <h3>גודל טקסט</h3>
+    <div class="size-row">
+      <button id="sizeMinus" aria-label="הקטן טקסט">−</button>
+      <div class="size-val" id="sizeVal">100%</div>
+      <button id="sizePlus" aria-label="הגדל טקסט">+</button>
+    </div>
+  </div>
+
+  <button class="panel-close" id="panelCloseBtn">סגור</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const root = document.documentElement;
+  const transcriptArea = document.getElementById('transcriptArea');
+  const emptyState = document.getElementById('emptyState');
+  const interimLine = document.getElementById('interimLine');
+  const micBtn = document.getElementById('micBtn');
+  const micLabel = document.getElementById('micLabel');
+  const micBars = document.getElementById('micBars').querySelectorAll('span');
+  const soloModeBtn = document.getElementById('soloModeBtn');
+  const dialogModeBtn = document.getElementById('dialogModeBtn');
+  const speakerRow = document.getElementById('speakerRow');
+  const meBtn = document.getElementById('meBtn');
+  const otherBtn = document.getElementById('otherBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const overlay = document.getElementById('overlay');
+  const panelCloseBtn = document.getElementById('panelCloseBtn');
+  const langSelect = document.getElementById('langSelect');
+  const sizeMinus = document.getElementById('sizeMinus');
+  const sizePlus = document.getElementById('sizePlus');
+  const sizeVal = document.getElementById('sizeVal');
+  const clearBtn = document.getElementById('clearBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const toast = document.getElementById('toast');
+
+  let state = {
+    mode: 'solo',        // 'solo' | 'dialog'
+    speaker: 'me',       // 'me' | 'other'
+    listening: false,
+    lang: 'he-IL',
+    scale: 1,
+    history: [],         // {speaker, text}
+    lastFinalText: ''
+  };
+
+  /* ---------------- Toast ---------------- */
+  let toastTimer;
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> toast.classList.remove('show'), 2200);
+  }
+
+  /* ---------------- Settings panel ---------------- */
+  function openPanel(){ settingsPanel.classList.add('open'); overlay.classList.add('open'); }
+  function closePanel(){ settingsPanel.classList.remove('open'); overlay.classList.remove('open'); }
+  settingsBtn.addEventListener('click', openPanel);
+  panelCloseBtn.addEventListener('click', closePanel);
+  overlay.addEventListener('click', closePanel);
+
+  document.querySelectorAll('[data-theme-btn]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-theme-btn]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      root.setAttribute('data-theme', b.dataset.themeBtn);
+    });
+  });
+  document.querySelectorAll('[data-contrast-btn]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-contrast-btn]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      root.setAttribute('data-contrast', b.dataset.contrastBtn);
+    });
+  });
+  document.querySelectorAll('[data-font-btn]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-font-btn]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      root.setAttribute('data-font', b.dataset.fontBtn);
+    });
+  });
+
+  sizeMinus.addEventListener('click', ()=> setScale(state.scale - 0.1));
+  sizePlus.addEventListener('click', ()=> setScale(state.scale + 0.1));
+  function setScale(v){
+    state.scale = Math.min(1.8, Math.max(0.7, v));
+    document.documentElement.style.setProperty('--scale', state.scale.toFixed(2));
+    sizeVal.textContent = Math.round(state.scale * 100) + '%';
+  }
+
+  langSelect.addEventListener('change', ()=>{
+    state.lang = langSelect.value;
+    if(recognition){ recognition.lang = state.lang; }
+    if(state.listening){ restartRecognition(); }
+  });
+
+  /* ---------------- Mode / speaker ---------------- */
+  soloModeBtn.addEventListener('click', ()=> setMode('solo'));
+  dialogModeBtn.addEventListener('click', ()=> setMode('dialog'));
+  function setMode(m){
+    state.mode = m;
+    soloModeBtn.classList.toggle('active', m === 'solo');
+    dialogModeBtn.classList.toggle('active', m === 'dialog');
+    speakerRow.classList.toggle('visible', m === 'dialog');
+  }
+  meBtn.addEventListener('click', ()=> setSpeaker('me'));
+  otherBtn.addEventListener('click', ()=> setSpeaker('other'));
+  function setSpeaker(s){
+    state.speaker = s;
+    meBtn.classList.toggle('active', s === 'me');
+    otherBtn.classList.toggle('active', s === 'other');
+  }
+
+  /* ---------------- Transcript rendering ---------------- */
+  function renderEntry(entry){
+    if(emptyState) emptyState.remove();
+    const div = document.createElement('div');
+    div.className = 'entry ' + (state.mode === 'dialog' ? entry.speaker : 'solo');
+    if(state.mode === 'dialog'){
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = entry.speaker === 'me' ? 'אני' : 'הצד השני';
+      div.appendChild(who);
+    }
+    const txt = document.createElement('span');
+    txt.textContent = entry.text;
+    div.appendChild(txt);
+    transcriptArea.appendChild(div);
+    transcriptArea.scrollTop = transcriptArea.scrollHeight;
+  }
+
+  function addFinalSegment(text){
+    text = text.trim();
+    if(!text) return;
+    if(text === state.lastFinalText) return; // duplicate guard
+    state.lastFinalText = text;
+    const entry = { speaker: state.speaker, text };
+    state.history.push(entry);
+    renderEntry(entry);
+    interimLine.textContent = '';
+  }
+
+  function updateInterimDisplay(text){
+    interimLine.textContent = text ? text : '';
+  }
+
+  /* ---------------- Speech recognition ---------------- */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+  let shouldListen = false;
+
+  if(SR){
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = state.lang;
+
+    recognition.onresult = (event)=>{
+      let interim = '';
+      for(let i = event.resultIndex; i < event.results.length; i++){
+        const transcript = event.results[i][0].transcript;
+        if(event.results[i].isFinal){
+          addFinalSegment(transcript);
+        } else {
+          interim += transcript;
+        }
+      }
+      updateInterimDisplay(interim);
+    };
+
+    let consecutiveErrors = 0;
+
+    recognition.onstart = ()=>{
+      consecutiveErrors = 0;
+      console.log('[LiveVoice] recognition started, lang=', recognition.lang);
+    };
+
+    recognition.onerror = (e)=>{
+      console.warn('[LiveVoice] recognition error:', e.error);
+      if(e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        showToast('נדרשת הרשאת מיקרופון בהגדרות הדפדפן');
+        stopListening();
+        return;
+      }
+      if(e.error === 'audio-capture'){
+        showToast('לא נמצא מיקרופון זמין');
+        stopListening();
+        return;
+      }
+      if(e.error === 'network'){
+        consecutiveErrors++;
+        showToast('בעיית רשת בזיהוי הדיבור');
+        if(consecutiveErrors >= 4){
+          showToast('האזנה נעצרה בגלל בעיית רשת חוזרת');
+          stopListening();
+        }
+        return;
+      }
+      if(e.error === 'no-speech'){
+        // normal — silence detected, onend will restart automatically
+        return;
+      }
+      if(e.error === 'aborted'){
+        // caused by our own stop() call, not a real failure
+        return;
+      }
+      consecutiveErrors++;
+      if(consecutiveErrors >= 5){
+        showToast('האזנה נעצרה: ' + e.error);
+        stopListening();
+      }
+    };
+
+    recognition.onend = ()=>{
+      if(shouldListen){
+        setTimeout(()=>{
+          if(shouldListen){
+            try{ recognition.start(); } catch(e){ console.warn('[LiveVoice] restart failed:', e); }
+          }
+        }, 150);
+      } else {
+        setMicVisualState(false);
+      }
+    };
+  } else {
+    micLabel.textContent = 'הדפדפן לא תומך בזיהוי דיבור';
+    micBtn.disabled = true;
+  }
+
+  function restartRecognition(){
+    if(!recognition) return;
+    try{ recognition.stop(); } catch(e){}
+  }
+
+  /* ---------------- Mic bars animation ---------------- */
+  /* NOTE: intentionally NOT using a separate getUserMedia() stream here.
+     Requesting the mic ourselves at the same time SpeechRecognition
+     requests it causes mic contention on many devices (esp. Android) —
+     recognition silently fails to capture audio while this visualizer
+     "wins" the microphone, producing a UI that looks like it's listening
+     but never transcribes anything. So this is a lightweight simulated
+     animation instead, tied to real recognition activity, not raw audio. */
+  let barsTimer;
+  function startBarsAnim(){
+    const bars = Array.from(micBars);
+    barsTimer = setInterval(()=>{
+      bars.forEach(bar=>{
+        const h = 10 + Math.random() * 40;
+        bar.style.height = h + 'px';
+      });
+    }, 140);
+  }
+  function stopBarsAnim(){
+    clearInterval(barsTimer);
+    micBars.forEach(b=> b.style.height = '10px');
+  }
+
+  /* ---------------- Mic control ---------------- */
+  function setMicVisualState(listening){
+    micBtn.classList.toggle('listening', listening);
+    micLabel.textContent = listening ? 'מקשיב…' : 'התחל להקשיב';
+    micBtn.setAttribute('aria-label', listening ? 'עצור האזנה' : 'התחל להקשיב');
+  }
+
+  function startListening(){
+    if(!recognition) return;
+    shouldListen = true;
+    state.listening = true;
+    setMicVisualState(true);
+    startBarsAnim();
+    try{ recognition.start(); } catch(e){}
+  }
+
+  function stopListening(){
+    shouldListen = false;
+    state.listening = false;
+    setMicVisualState(false);
+    updateInterimDisplay('');
+    stopBarsAnim();
+    if(recognition){ try{ recognition.stop(); } catch(e){} }
+  }
+
+  micBtn.addEventListener('click', ()=>{
+    if(state.listening) stopListening(); else startListening();
+  });
+
+  /* ---------------- Actions ---------------- */
+  clearBtn.addEventListener('click', ()=>{
+    state.history = [];
+    state.lastFinalText = '';
+    transcriptArea.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'empty-state';
+    div.id = 'emptyState';
+    div.innerHTML = '<div class="waves"><span></span><span style="height:34px"></span><span style="height:16px"></span><span style="height:30px"></span><span></span></div><h2>מוכנים להקשיב</h2><p>לחצו על כפתור המיקרופון למטה כדי להתחיל לתמלל את השיחה בזמן אמת, בעברית או באנגלית.</p>';
+    transcriptArea.appendChild(div);
+    updateInterimDisplay('');
+    showToast('המסך נוקה');
+  });
+
+  function historyAsText(){
+    return state.history.map(e=>{
+      if(state.mode === 'dialog'){
+        return (e.speaker === 'me' ? 'אני: ' : 'הצד השני: ') + e.text;
+      }
+      return e.text;
+    }).join('\n');
+  }
+
+  copyBtn.addEventListener('click', async ()=>{
+    const text = historyAsText();
+    if(!text){ showToast('אין טקסט להעתקה'); return; }
+    try{
+      await navigator.clipboard.writeText(text);
+      showToast('הטקסט הועתק');
+    }catch(e){
+      showToast('לא ניתן להעתיק');
+    }
+  });
+
+  shareBtn.addEventListener('click', async ()=>{
+    const text = historyAsText();
+    if(!text){ showToast('אין טקסט לשיתוף'); return; }
+    if(navigator.share){
+      try{ await navigator.share({ text, title: 'רואים את הקולות' }); }
+      catch(e){ /* user cancelled */ }
+    } else {
+      try{
+        await navigator.clipboard.writeText(text);
+        showToast('שיתוף אינו נתמך – הטקסט הועתק');
+      }catch(e){ showToast('שיתוף אינו נתמך'); }
+    }
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') closePanel();
+  });
+})();
+</script>
+</body>
+</html>
