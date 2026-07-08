@@ -400,7 +400,7 @@ select.lang-select{
       </div>
       <div class="brand-text">
         <h1>רואים את הקולות</h1>
-        <p>LIVEVOICE</p>
+        <p>LIVEVOICE · <span id="verBadge"></span></p>
       </div>
     </div>
     <button class="icon-btn" id="settingsBtn" aria-label="הגדרות נגישות">
@@ -511,6 +511,11 @@ select.lang-select{
 
 <script>
 (function(){
+  const APP_VERSION = 'v1.3';
+  console.log('[LiveVoice] build', APP_VERSION);
+  const verBadge = document.getElementById('verBadge');
+  if(verBadge) verBadge.textContent = APP_VERSION;
+
   const root = document.documentElement;
   const transcriptArea = document.getElementById('transcriptArea');
   const emptyState = document.getElementById('emptyState');
@@ -544,7 +549,8 @@ select.lang-select{
     scale: 1,
     history: [],         // {speaker, text}
     lastFinalText: '',
-    finalIndexMap: new Map()  // resultIndex -> {el, text, entry}
+    finalIndexMap: new Map(),  // resultIndex -> {el, text, entry}
+    lastFinalSlot: null
   };
 
   /* ---------------- Toast ---------------- */
@@ -612,6 +618,7 @@ select.lang-select{
   otherBtn.addEventListener('click', ()=> setSpeaker('other'));
   function setSpeaker(s){
     state.speaker = s;
+    state.lastFinalSlot = null;
     meBtn.classList.toggle('active', s === 'me');
     otherBtn.classList.toggle('active', s === 'other');
   }
@@ -642,28 +649,53 @@ select.lang-select{
     transcriptArea.scrollTop = transcriptArea.scrollHeight;
   }
 
-  // Android Chrome (and some others) can re-fire isFinal=true for the SAME
-  // result index with progressively longer text ("גם" -> "גם זה" -> "גם זה מופיע")
-  // instead of firing it once when the utterance is truly complete. If we
-  // simply appended on every isFinal event, each of those partial-but-final
-  // events becomes its own history line. Instead we key final results by
-  // their result index and update that single entry in place; only a brand
-  // new index creates a new history line.
+  // Different browsers/engines misbehave in different ways with continuous
+  // + interim results. Two patterns we've seen in the wild:
+  //   (a) SAME result index re-fires isFinal=true with progressively longer
+  //       text ("גם" -> "גם זה" -> "גם זה מופיע")
+  //   (b) a NEW result index appears each time, but its text is the full
+  //       cumulative sentence again ("בין" -> "בין שני" -> "בין שני שלח"),
+  //       so treating every new index as a new line still produces
+  //       duplicated, ever-growing entries.
+  // We handle both by keeping a reference to the most recently committed
+  // "slot" and merging into it whenever the new text and the previous
+  // slot's text overlap as a prefix, regardless of whether the index is
+  // the same or brand new.
   function commitFinalAtIndex(index, text){
     text = text.trim();
     if(!text) return;
+
     const existing = state.finalIndexMap.get(index);
     if(existing){
-      if(existing.text === text) return;
+      if(existing.text === text) return; // no change, ignore
       existing.text = text;
       existing.entry.text = text;
       updateEntryElement(existing.el, text);
+      state.lastFinalSlot = existing;
+      interimLine.textContent = '';
       return;
     }
+
+    const prev = state.lastFinalSlot;
+    if(prev && (text.startsWith(prev.text) || prev.text.startsWith(text))){
+      // overlapping with the previous entry -> same utterance, merge in place
+      if(text.length > prev.text.length){
+        prev.text = text;
+        prev.entry.text = text;
+        updateEntryElement(prev.el, text);
+      }
+      state.finalIndexMap.set(index, prev);
+      interimLine.textContent = '';
+      return;
+    }
+
+    // genuinely new, unrelated utterance
     const entry = { speaker: state.speaker, text };
     state.history.push(entry);
     const el = renderEntry(entry);
-    state.finalIndexMap.set(index, { el, text, entry });
+    const slot = { el, text, entry };
+    state.finalIndexMap.set(index, slot);
+    state.lastFinalSlot = slot;
     interimLine.textContent = '';
   }
 
@@ -706,6 +738,7 @@ select.lang-select{
     recognition.onstart = ()=>{
       consecutiveErrors = 0;
       state.finalIndexMap.clear();
+      state.lastFinalSlot = null;
       console.log('[LiveVoice] recognition started, lang=', recognition.lang);
     };
 
@@ -823,6 +856,7 @@ select.lang-select{
     state.history = [];
     state.lastFinalText = '';
     state.finalIndexMap.clear();
+    state.lastFinalSlot = null;
     transcriptArea.innerHTML = '';
     const div = document.createElement('div');
     div.className = 'empty-state';
