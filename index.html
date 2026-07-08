@@ -163,6 +163,48 @@ main{
   font:600 calc(26px * var(--scale)) / 1.5 var(--display-font);
   animation:rise .3s ease;
 }
+.entry-row{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+.entry-row .entry-text{
+  flex:1;
+  word-break:break-word;
+  cursor:pointer;
+  border-radius:8px;
+  padding:2px 6px;
+  margin:-2px -6px;
+}
+.entry-row .entry-text:hover,
+.entry-row .entry-text:focus-visible{
+  background:var(--surface-2);
+}
+.entry.editing{
+  outline:2px dashed var(--focus);
+  outline-offset:3px;
+  background:var(--surface-2);
+}
+.entry-text[contenteditable="true"]{
+  outline:none;
+  cursor:text;
+  background:var(--bg);
+  border-radius:8px;
+  padding:2px 6px;
+}
+.edit-controls{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+}
+.edit-controls button{
+  padding:7px 16px;
+  border-radius:999px;
+  font:700 12px var(--ui-font);
+  cursor:pointer;
+}
+.edit-save{ background:var(--accent-me); color:var(--surface); border:none; }
+.edit-cancel{ background:var(--surface-2); color:var(--muted); border:1px solid var(--border); }
 @keyframes rise{ from{ opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
 
 .entry.me{
@@ -511,7 +553,7 @@ select.lang-select{
 
 <script>
 (function(){
-  const APP_VERSION = 'v1.3';
+  const APP_VERSION = 'v1.5';
   console.log('[LiveVoice] build', APP_VERSION);
   const verBadge = document.getElementById('verBadge');
   if(verBadge) verBadge.textContent = APP_VERSION;
@@ -634,16 +676,97 @@ select.lang-select{
       who.textContent = entry.speaker === 'me' ? 'אני' : 'הצד השני';
       div.appendChild(who);
     }
+    const row = document.createElement('div');
+    row.className = 'entry-row';
+
     const txt = document.createElement('span');
     txt.className = 'entry-text';
     txt.textContent = entry.text;
-    div.appendChild(txt);
+    txt.setAttribute('role', 'button');
+    txt.setAttribute('tabindex', '0');
+    txt.setAttribute('aria-label', 'לחץ לעריכת הטקסט');
+    txt.addEventListener('click', ()=> enterEditMode(div, txt, entry));
+    txt.addEventListener('keydown', (e)=>{
+      if((e.key === 'Enter' || e.key === ' ') && txt.getAttribute('contenteditable') !== 'true'){
+        e.preventDefault();
+        enterEditMode(div, txt, entry);
+      }
+    });
+    row.appendChild(txt);
+
+    div.appendChild(row);
     transcriptArea.appendChild(div);
     transcriptArea.scrollTop = transcriptArea.scrollHeight;
     return div;
   }
 
+  function enterEditMode(div, txtEl, entry){
+    if(div.classList.contains('editing')) return;
+    // if user is mid-edit elsewhere, close it first without saving changes
+    document.querySelectorAll('.entry.editing').forEach(openDiv=>{
+      const btn = openDiv.querySelector('.edit-cancel');
+      if(btn) btn.click();
+    });
+
+    div.classList.add('editing');
+    const original = entry.text;
+    txtEl.setAttribute('contenteditable', 'true');
+    txtEl.focus();
+    const range = document.createRange();
+    range.selectNodeContents(txtEl);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const controls = document.createElement('div');
+    controls.className = 'edit-controls';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'edit-save';
+    saveBtn.textContent = 'שמור';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'edit-cancel';
+    cancelBtn.textContent = 'ביטול';
+    controls.appendChild(saveBtn);
+    controls.appendChild(cancelBtn);
+    div.appendChild(controls);
+
+    function keyHandler(e){
+      if(e.key === 'Enter'){ e.preventDefault(); finishEdit(true); }
+      if(e.key === 'Escape'){ e.preventDefault(); finishEdit(false); }
+    }
+    txtEl.addEventListener('keydown', keyHandler);
+
+    function finishEdit(save){
+      if(save){
+        const newText = txtEl.textContent.trim();
+        if(newText){
+          entry.text = newText;
+          txtEl.textContent = newText;
+          // keep any active merge-chain slot in sync so future growth
+          // comparisons use the corrected text, not the misheard original
+          if(state.lastFinalSlot && state.lastFinalSlot.entry === entry){
+            state.lastFinalSlot.text = newText;
+          }
+          state.finalIndexMap.forEach(slot=>{ if(slot.entry === entry) slot.text = newText; });
+        } else {
+          txtEl.textContent = original;
+        }
+      } else {
+        txtEl.textContent = original;
+      }
+      txtEl.removeAttribute('contenteditable');
+      txtEl.removeEventListener('keydown', keyHandler);
+      div.classList.remove('editing');
+      controls.remove();
+    }
+
+    saveBtn.addEventListener('click', ()=> finishEdit(true));
+    cancelBtn.addEventListener('click', ()=> finishEdit(false));
+  }
+
   function updateEntryElement(el, text){
+    if(el.classList.contains('editing')) return; // don't overwrite while user is editing
     const txt = el.querySelector('.entry-text');
     if(txt) txt.textContent = text;
     transcriptArea.scrollTop = transcriptArea.scrollHeight;
