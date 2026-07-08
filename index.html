@@ -543,7 +543,8 @@ select.lang-select{
     lang: 'he-IL',
     scale: 1,
     history: [],         // {speaker, text}
-    lastFinalText: ''
+    lastFinalText: '',
+    finalIndexMap: new Map()  // resultIndex -> {el, text, entry}
   };
 
   /* ---------------- Toast ---------------- */
@@ -627,20 +628,42 @@ select.lang-select{
       div.appendChild(who);
     }
     const txt = document.createElement('span');
+    txt.className = 'entry-text';
     txt.textContent = entry.text;
     div.appendChild(txt);
     transcriptArea.appendChild(div);
     transcriptArea.scrollTop = transcriptArea.scrollHeight;
+    return div;
   }
 
-  function addFinalSegment(text){
+  function updateEntryElement(el, text){
+    const txt = el.querySelector('.entry-text');
+    if(txt) txt.textContent = text;
+    transcriptArea.scrollTop = transcriptArea.scrollHeight;
+  }
+
+  // Android Chrome (and some others) can re-fire isFinal=true for the SAME
+  // result index with progressively longer text ("גם" -> "גם זה" -> "גם זה מופיע")
+  // instead of firing it once when the utterance is truly complete. If we
+  // simply appended on every isFinal event, each of those partial-but-final
+  // events becomes its own history line. Instead we key final results by
+  // their result index and update that single entry in place; only a brand
+  // new index creates a new history line.
+  function commitFinalAtIndex(index, text){
     text = text.trim();
     if(!text) return;
-    if(text === state.lastFinalText) return; // duplicate guard
-    state.lastFinalText = text;
+    const existing = state.finalIndexMap.get(index);
+    if(existing){
+      if(existing.text === text) return;
+      existing.text = text;
+      existing.entry.text = text;
+      updateEntryElement(existing.el, text);
+      return;
+    }
     const entry = { speaker: state.speaker, text };
     state.history.push(entry);
-    renderEntry(entry);
+    const el = renderEntry(entry);
+    state.finalIndexMap.set(index, { el, text, entry });
     interimLine.textContent = '';
   }
 
@@ -661,10 +684,16 @@ select.lang-select{
 
     recognition.onresult = (event)=>{
       let interim = '';
-      for(let i = event.resultIndex; i < event.results.length; i++){
-        const transcript = event.results[i][0].transcript;
-        if(event.results[i].isFinal){
-          addFinalSegment(transcript);
+      // Deliberately iterate the FULL results list from 0 every time,
+      // not just from event.resultIndex — some Android builds re-send
+      // already-seen results with resultIndex stuck at 0, so relying on
+      // resultIndex would skip results or (as before) treat a growing
+      // partial-final result as brand new text each time.
+      for(let i = 0; i < event.results.length; i++){
+        const result = event.results[i];
+        const transcript = result[0].transcript;
+        if(result.isFinal){
+          commitFinalAtIndex(i, transcript);
         } else {
           interim += transcript;
         }
@@ -676,6 +705,7 @@ select.lang-select{
 
     recognition.onstart = ()=>{
       consecutiveErrors = 0;
+      state.finalIndexMap.clear();
       console.log('[LiveVoice] recognition started, lang=', recognition.lang);
     };
 
@@ -792,6 +822,7 @@ select.lang-select{
   clearBtn.addEventListener('click', ()=>{
     state.history = [];
     state.lastFinalText = '';
+    state.finalIndexMap.clear();
     transcriptArea.innerHTML = '';
     const div = document.createElement('div');
     div.className = 'empty-state';
