@@ -185,6 +185,11 @@ main{
   outline-offset:3px;
   background:var(--surface-2);
 }
+.entry.speaking{
+  outline:2px solid var(--accent-me);
+  outline-offset:3px;
+  background:var(--accent-me-soft);
+}
 .entry-text[contenteditable="true"]{
   outline:none;
   cursor:text;
@@ -339,9 +344,10 @@ main{
 }
 .mic-label{ font:700 14px var(--ui-font); color:var(--ink); min-height:1.2em; }
 
-.actions-row{ display:flex; gap:8px; }
+.actions-row{ display:flex; gap:8px; flex-wrap:wrap; }
 .action-btn{
   flex:1;
+  min-width:calc(50% - 4px);
   display:flex; align-items:center; justify-content:center; gap:6px;
   padding:10px 6px;
   border-radius:var(--radius-sm);
@@ -353,6 +359,11 @@ main{
 }
 .action-btn svg{ width:16px; height:16px; flex-shrink:0; }
 .action-btn.danger{ color:var(--danger); }
+.action-btn.active{
+  background:var(--accent-me);
+  color:var(--surface);
+  border-color:var(--accent-me);
+}
 
 /* ---------- SETTINGS PANEL ---------- */
 .overlay{
@@ -484,6 +495,10 @@ select.lang-select{
     </div>
 
     <div class="actions-row">
+      <button class="action-btn" id="readModeBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        הקראה
+      </button>
       <button class="action-btn" id="clearBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
         נקה מסך
@@ -553,7 +568,7 @@ select.lang-select{
 
 <script>
 (function(){
-  const APP_VERSION = 'v1.5';
+  const APP_VERSION = 'v1.6';
   console.log('[LiveVoice] build', APP_VERSION);
   const verBadge = document.getElementById('verBadge');
   if(verBadge) verBadge.textContent = APP_VERSION;
@@ -581,12 +596,14 @@ select.lang-select{
   const clearBtn = document.getElementById('clearBtn');
   const copyBtn = document.getElementById('copyBtn');
   const shareBtn = document.getElementById('shareBtn');
+  const readModeBtn = document.getElementById('readModeBtn');
   const toast = document.getElementById('toast');
 
   let state = {
     mode: 'solo',        // 'solo' | 'dialog'
     speaker: 'me',       // 'me' | 'other'
     listening: false,
+    readMode: false,
     lang: 'he-IL',
     scale: 1,
     history: [],         // {speaker, text}
@@ -684,12 +701,16 @@ select.lang-select{
     txt.textContent = entry.text;
     txt.setAttribute('role', 'button');
     txt.setAttribute('tabindex', '0');
-    txt.setAttribute('aria-label', 'לחץ לעריכת הטקסט');
-    txt.addEventListener('click', ()=> enterEditMode(div, txt, entry));
+    txt.setAttribute('aria-label', 'לחץ לעריכה, או להקראה במצב הקראה');
+    txt.addEventListener('click', ()=>{
+      if(state.readMode){ speakText(entry.text, div); }
+      else { enterEditMode(div, txt, entry); }
+    });
     txt.addEventListener('keydown', (e)=>{
       if((e.key === 'Enter' || e.key === ' ') && txt.getAttribute('contenteditable') !== 'true'){
         e.preventDefault();
-        enterEditMode(div, txt, entry);
+        if(state.readMode){ speakText(entry.text, div); }
+        else { enterEditMode(div, txt, entry); }
       }
     });
     row.appendChild(txt);
@@ -973,6 +994,37 @@ select.lang-select{
   micBtn.addEventListener('click', ()=>{
     if(state.listening) stopListening(); else startListening();
   });
+
+  /* ---------------- Read aloud ---------------- */
+  readModeBtn.addEventListener('click', ()=>{
+    state.readMode = !state.readMode;
+    readModeBtn.classList.toggle('active', state.readMode);
+    showToast(state.readMode ? 'מצב הקראה פעיל — לחצי על שורה כדי לשמוע אותה' : 'מצב הקראה כבוי');
+  });
+
+  function speakText(text, div){
+    if(!('speechSynthesis' in window)){
+      showToast('הדפדפן לא תומך בהקראה');
+      return;
+    }
+    speechSynthesis.cancel();
+    // pause listening while speaking so the mic doesn't pick up and
+    // re-transcribe the read-aloud audio; resume automatically after
+    const wasListening = state.listening;
+    if(wasListening) stopListening();
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = /[\u0590-\u05FF]/.test(text) ? 'he-IL' : 'en-US';
+    utter.rate = 1;
+    if(div) div.classList.add('speaking');
+    const cleanup = ()=>{
+      if(div) div.classList.remove('speaking');
+      if(wasListening) startListening();
+    };
+    utter.onend = cleanup;
+    utter.onerror = cleanup;
+    speechSynthesis.speak(utter);
+  }
 
   /* ---------------- Actions ---------------- */
   clearBtn.addEventListener('click', ()=>{
